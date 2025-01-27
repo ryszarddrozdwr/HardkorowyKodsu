@@ -1,34 +1,50 @@
-var builder = WebApplication.CreateBuilder(args);
+using Backend.Api;
+using Backend.Api.Database;
+using Backend.Api.Extensions;
+using Serilog;
 
-// Add services to the container.
-
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-
-app.UseHttpsRedirection();
-
-var summaries = new[]
+internal class Program
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    private static void Main(string[] args)
+    {
+        var builder = WebApplication.CreateBuilder(args);
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-});
+        builder.Host.UseSerilog((context, configuration) =>
+            configuration.ReadFrom.Configuration(context.Configuration));
 
-app.Run();
+        // Add services to the container.
 
-internal record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+        const string SqlConnectionName = "DatabaseConnection";
+        const string DatabaseName = "Database";
+
+        var connectionString = builder.Configuration.GetConnectionString(SqlConnectionName);
+        if (string.IsNullOrEmpty(connectionString))
+        {
+            throw new Exception($"Configuration Error. Check configuration: ConnectionString");
+        }
+        var databaseName = builder.Configuration.GetValue<string>(DatabaseName);
+        if (string.IsNullOrEmpty(databaseName))
+        {
+            throw new Exception($"Configuration Error. Check configuration: Database");
+        }
+        if(!(new DatabaseNameValidator().Check(connectionString,databaseName)))
+        {
+            throw new Exception($"Configuration Error. Check DatabaseName: {databaseName}");
+        }
+
+        var app = builder.Build();
+        app.UseSerilogRequestLogging();
+
+        // Configure the HTTP request pipeline.
+
+        app.UseHttpsRedirection();
+        var api = app.MapGroup("api");
+        api.AddEndpointFilter<ExceptionHandlingFilter>();
+
+        api.AddDatabaseApi(connectionString, databaseName);
+        var v1 = api.MapGroup("v1");
+        v1.AddDatabaseApiVersion1(connectionString, databaseName);
+
+        app.Run();
+    }
 }

@@ -1,6 +1,22 @@
-@Backend_HostAddress = http://localhost:5115
+@HostAddress = https://localhost:53405/api
+@DatabaseAddress = {{HostAddress}}/database
 
-GET {{Backend_HostAddress}}/weatherforecast/
-Accept: application/json
+GET {{DatabaseAddress}}/databasename
+
+###
+
+GET {{DatabaseAddress}}/tables
+
+###
+
+GET {{DatabaseAddress}}/tables/11
+
+###
+
+GET {{DatabaseAddress}}/views
+
+###
+
+GET {{DatabaseAddress}}/views/12
 
 ###
